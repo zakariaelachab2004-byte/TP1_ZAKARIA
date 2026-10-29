@@ -1,0 +1,5 @@
+Déclaration d'utilisation d'outils d'assistance technique (IA) :
+
+L'intelligence artificielle a été consultée ponctuellement en tant qu'assistant pédagogique et de support au débogage pour :
+- Clarifier certains aspects de la documentation des API REST (Jakarta RS) et de la manipulation JSON-P.
+- Aider à la résolution d'erreurs de configuration (gestion des exceptions et structure des composants JSF/PrimeFaces).
