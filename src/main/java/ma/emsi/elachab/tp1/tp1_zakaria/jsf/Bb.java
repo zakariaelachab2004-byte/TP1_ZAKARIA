@@ -6,118 +6,73 @@ import jakarta.faces.model.SelectItem;
 import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import ma.emsi.elachab.tp0.tp0_elachab.service.GenerateurReponse;
+import ma.emsi.elachab.tp1.tp1_zakaria.llm.JsonAdapterPourGemini;
+import ma.emsi.elachab.tp1.tp1_zakaria.llm.LlmInteraction;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * Backing bean pour la page JSF index.xhtml.
  * Portée view pour conserver l'état de la conversation qui dure pendant plusieurs requêtes HTTP.
- * La portée view nécessite l'implémentation de Serializable (le backing bean peut être mis en mémoire secondaire).
  */
 @Named
 @ViewScoped
 public class Bb implements Serializable {
 
-    /**
-     * Rôle "système" que l'on attribuera plus tard à un LLM.
-     * Possible d'écrire un nouveau rôle dans la liste déroulante.
-     */
     private String roleSysteme;
-
-    /**
-     * Quand le rôle est choisi par l'utilisateur dans la liste déroulante,
-     * il n'est plus possible de le modifier (voir code de la page JSF), sauf si on veut un nouveau chat.
-     */
     private boolean roleSystemeChangeable = true;
-
-    /**
-     * Liste de tous les rôles de l'API prédéfinis.
-     */
     private List<SelectItem> listeRolesSysteme;
-
-    /**
-     * Dernière question posée par l'utilisateur.
-     */
     private String question;
-
-    /**
-     * Dernière réponse de l'API OpenAI.
-     */
     private String reponse;
-
-    /**
-     * La conversation depuis le début.
-     */
     private StringBuilder conversation = new StringBuilder();
 
-    /**
-     * Service pour modifier la question et générer la réponse.
-     */
-    @Inject
-    private GenerateurReponse generateurReponse;
+    // --- Ajout des propriétés pour le mode Debug (TP1) ---
+    private boolean debug;
+    private String texteRequeteJson;
+    private String texteReponseJson;
 
     /**
-     * Contexte JSF. Utilisé pour qu'un message d'erreur s'affiche dans le formulaire.
+     * Service pour manipuler le JSON et communiquer avec l'API Gemini. (Remplace GenerateurReponse)
      */
+    @Inject
+    private JsonAdapterPourGemini jsonAdapter;
+
     @Inject
     private FacesContext facesContext;
 
-    /**
-     * Obligatoire pour un bean CDI (classe gérée par CDI), s'il y a un autre constructeur.
-     */
     public Bb() {
     }
 
-    public String getRoleSysteme() {
-        return this.roleSysteme;
-    }
+    public String getRoleSysteme() { return this.roleSysteme; }
+    public void setRoleSysteme(String roleSysteme) { this.roleSysteme = roleSysteme; }
 
-    public void setRoleSysteme(String roleSysteme) {
-        this.roleSysteme = roleSysteme;
-    }
+    public boolean isRoleSystemeChangeable() { return this.roleSystemeChangeable; }
 
-    public boolean isRoleSystemeChangeable() {
-        return this.roleSystemeChangeable;
-    }
+    public String getQuestion() { return this.question; }
+    public void setQuestion(String question) { this.question = question; }
 
-    public String getQuestion() {
-        return this.question;
-    }
+    public String getReponse() { return this.reponse; }
+    public void setReponse(String reponse) { this.reponse = reponse; }
 
-    public void setQuestion(String question) {
-        this.question = question;
-    }
+    public String getConversation() { return conversation.toString(); }
+    public void setConversation(String conversation) { this.conversation = new StringBuilder(conversation); }
 
-    public String getReponse() {
-        return this.reponse;
-    }
+    // --- Getters et Setters pour le mode Debug ---
+    public boolean isDebug() { return debug; }
+    public void setDebug(boolean debug) { this.debug = debug; }
 
-    /**
-     * setter indispensable pour le textarea.
-     *
-     * @param reponse la réponse à la question.
-     */
-    public void setReponse(String reponse) {
-        this.reponse = reponse;
-    }
+    public String getTexteRequeteJson() { return texteRequeteJson; }
+    public void setTexteRequeteJson(String texteRequeteJson) { this.texteRequeteJson = texteRequeteJson; }
 
-    public String getConversation() {
-        return conversation.toString();
-    }
+    public String getTexteReponseJson() { return texteReponseJson; }
+    public void setTexteReponseJson(String texteReponseJson) { this.texteReponseJson = texteReponseJson; }
 
-    public void setConversation(String conversation) {
-        this.conversation = new StringBuilder(conversation);
-    }
 
     /**
-     * Envoie la question au serveur.
-     * En attendant de l'envoyer à un LLM, le serveur fait un traitement quelconque, juste pour tester :
-     * Le traitement consiste à copier la question en minuscules et à l'entourer avec "||". Le rôle système
-     * est ajouté au début de la première réponse.
-     *
+     * Envoie la question à l'API Gemini via le JsonAdapter.
      * @return null pour rester sur la même page.
      */
     public String envoyer() {
@@ -128,27 +83,41 @@ public class Bb implements Serializable {
             return null;
         }
 
+        // Si c'est le début de la conversation, on transmet le rôle système et on bloque la liste déroulante
         if (this.conversation.isEmpty()) {
+            this.jsonAdapter.setSystemRole(this.roleSysteme);
             this.roleSystemeChangeable = false;
         }
-        this.reponse = this.generateurReponse.genererReponse(this.question, this.roleSysteme);
 
-        afficherConversation();
+        // Appel à l'API du LLM (Code fourni dans l'énoncé)
+        try {
+            LlmInteraction interaction = jsonAdapter.envoyerRequete(this.question);
+            this.reponse = interaction.reponseExtraite();
+            this.texteRequeteJson = interaction.questionJson();
+            this.texteReponseJson = interaction.reponseJson();
+
+            afficherConversation();
+        } catch (Exception e) {
+            this.reponse = "Erreur : " + e.getMessage();
+            FacesMessage message = new FacesMessage(FacesMessage.SEVERITY_ERROR,
+                    "Problème de connexion avec l'API du LLM",
+                    "Problème de connexion avec l'API du LLM\n" + e.getMessage() + "\n" + Arrays.toString(e.getStackTrace()));
+            facesContext.addMessage(null, message);
+        }
+
         return null;
     }
 
     /**
      * Pour un nouveau chat.
+     * L'utilisation de faces-redirect=true est cruciale pour détruire le bean ViewScoped et réinitialiser la conversation.
      */
     public String nouveauChat() {
-        return "index";
+        return "index.xhtml?faces-redirect=true";
     }
 
-    /**
-     * Pour afficher la conversation dans le textArea de la page JSF.
-     */
     private void afficherConversation() {
-        this.conversation.append("== User:\n").append(question).append("\n== Serveur:\n").append(reponse).append("\n");
+        this.conversation.append("== User:\n").append(question).append("\n== Serveur:\n").append(reponse).append("\n\n");
     }
 
     public List<SelectItem> getRolesSysteme() {
