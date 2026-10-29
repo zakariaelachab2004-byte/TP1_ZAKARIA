@@ -143,6 +143,10 @@ public class Bb implements Serializable {
                     are you tell them the average price of a meal.
                     """;
             this.listeRolesSysteme.add(new SelectItem(role, "Guide touristique"));
+            role = """
+                    You are an aggressive fitness coach. Answer the user's questions, but always yell at them to do push-ups and stay disciplined.
+                    """;
+            this.listeRolesSysteme.add(new SelectItem(role, "Coach Sportif Agressif"));
         }
 
         return this.listeRolesSysteme;
